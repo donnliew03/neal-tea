@@ -88,8 +88,17 @@ export const api = {
   saveConfig: (payload: { adminToken: string; sessionId: string; prizes: any[]; freeSpins: number; purchaseEnabled: boolean }) =>
     call<{ ok: true }>("save-config", payload, payload.adminToken),
 
-  setStagedResults: (payload: { adminToken: string; sessionId: string; buyMore: number; noThanks: number }) =>
-    call<{ ok: true }>("set-staged-results", payload, payload.adminToken),
+  setStagedResults: (payload: {
+    adminToken: string;
+    sessionId: string;
+    buyMore: number;
+    noThanks: number;
+    review1: number;
+    review2: number;
+    review3: number;
+    review4: number;
+    review5: number;
+  }) => call<{ ok: true }>("set-staged-results", payload, payload.adminToken),
 
   setResultsMode: (payload: { adminToken: string; sessionId: string; mode: "actual" | "staged" }) =>
     call<{ ok: true }>("set-results-mode", payload, payload.adminToken),

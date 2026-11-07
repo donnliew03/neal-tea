@@ -71,8 +71,16 @@ export const handler: Handler = async (event) => {
       prizeDistribution,
     },
     staged: staged
-      ? { buyMore: staged.staged_buy_more, noThanks: staged.staged_no_thanks }
-      : { buyMore: 0, noThanks: 0 },
+      ? {
+          buyMore: staged.staged_buy_more,
+          noThanks: staged.staged_no_thanks,
+          review1: staged.staged_review_1,
+          review2: staged.staged_review_2,
+          review3: staged.staged_review_3,
+          review4: staged.staged_review_4,
+          review5: staged.staged_review_5,
+        }
+      : { buyMore: 0, noThanks: 0, review1: 0, review2: 0, review3: 0, review4: 0, review5: 0 },
     config: {
       prizes,
       freeSpins: config?.free_spins_per_participant ?? 2,

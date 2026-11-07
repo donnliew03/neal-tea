@@ -59,6 +59,11 @@ export default function AdminPage() {
 
   const [stagedBuyMore, setStagedBuyMore] = useState(0);
   const [stagedNoThanks, setStagedNoThanks] = useState(0);
+  const [stagedReview1, setStagedReview1] = useState(0);
+  const [stagedReview2, setStagedReview2] = useState(0);
+  const [stagedReview3, setStagedReview3] = useState(0);
+  const [stagedReview4, setStagedReview4] = useState(0);
+  const [stagedReview5, setStagedReview5] = useState(0);
   const [resultsMode, setResultsMode] = useState<"actual" | "staged">("actual");
   const [resultsModeSaving, setResultsModeSaving] = useState(false);
 
@@ -92,18 +97,33 @@ export default function AdminPage() {
     await supabase.auth.signOut();
   }
 
-  async function refreshResults() {
+  // `syncConfig` controls whether this call is also allowed to overwrite the
+  // admin's in-progress settings edits (prize weights, free-spin count, the
+  // Actual/Staged toggle and its staged numbers) with whatever is currently
+  // saved on the server. The live numbers (`results` itself) are always
+  // refreshed. Only the initial load and the moment right after a successful
+  // save should sync config — the periodic poll and the manual "Refresh"
+  // buttons must NOT, or an admin who clicks "Staged" but hasn't hit Save
+  // yet would see their selection silently revert a few seconds later.
+  async function refreshResults(syncConfig = false) {
     if (!adminToken || !liveSession.id) return;
     setResultsLoading(true);
     try {
       const r = await api.getPrivateResults({ adminToken, sessionId: liveSession.id });
       setResults(r);
-      setPrizes(r.config.prizes);
-      setFreeSpins(r.config.freeSpins);
-      setPurchaseEnabled(r.config.purchaseEnabled);
-      setStagedBuyMore(r.staged.buyMore);
-      setStagedNoThanks(r.staged.noThanks);
-      setResultsMode(r.config.resultsMode ?? "actual");
+      if (syncConfig) {
+        setPrizes(r.config.prizes);
+        setFreeSpins(r.config.freeSpins);
+        setPurchaseEnabled(r.config.purchaseEnabled);
+        setStagedBuyMore(r.staged.buyMore);
+        setStagedNoThanks(r.staged.noThanks);
+        setStagedReview1(r.staged.review1);
+        setStagedReview2(r.staged.review2);
+        setStagedReview3(r.staged.review3);
+        setStagedReview4(r.staged.review4);
+        setStagedReview5(r.staged.review5);
+        setResultsMode(r.config.resultsMode ?? "actual");
+      }
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't load results.");
     } finally {
@@ -112,15 +132,16 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (adminToken && liveSession.id) refreshResults();
+    if (adminToken && liveSession.id) refreshResults(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminToken, liveSession.id]);
 
   useEffect(() => {
     if (!adminToken || !liveSession.id) return;
     // Poll regardless of which tab is open, so live numbers on Presentation
-    // Control stay fresh even if you never click into Private Results.
-    const interval = setInterval(refreshResults, 5000);
+    // Control stay fresh even if you never click into Private Results. Does
+    // NOT sync config/toggle state — see refreshResults' syncConfig note.
+    const interval = setInterval(() => refreshResults(false), 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminToken, liveSession.id]);
@@ -179,9 +200,14 @@ export default function AdminPage() {
           sessionId: liveSession.id,
           buyMore: stagedBuyMore,
           noThanks: stagedNoThanks,
+          review1: stagedReview1,
+          review2: stagedReview2,
+          review3: stagedReview3,
+          review4: stagedReview4,
+          review5: stagedReview5,
         });
       }
-      await refreshResults();
+      await refreshResults(true);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't save results display setting.");
     } finally {
@@ -412,8 +438,9 @@ export default function AdminPage() {
                 <Card>
                   <h3 className="font-semibold text-matcha-800 mb-2">Results shown to class</h3>
                   <p className="text-xs text-matcha-500 mb-3">
-                    Controls the purchase-decision numbers shown at "Lucky Spin Results" and later in the Ethical
-                    Reveal — either your class's real decisions, or a set of numbers you enter yourself.
+                    Controls BOTH the star-rating Reviews and the purchase-decision numbers shown at "Review
+                    Results", "Lucky Spin Results", and later in the Ethical Reveal — either your class's real
+                    numbers, or a set of numbers you enter yourself. One switch covers both.
                   </p>
                   <div className="flex gap-2 mb-3">
                     <button
@@ -435,23 +462,51 @@ export default function AdminPage() {
                   </div>
 
                   {resultsMode === "staged" && (
-                    <div className="flex items-center gap-3 flex-wrap mb-3">
-                      <label className="text-sm text-matcha-700">Buy more</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={stagedBuyMore}
-                        onChange={(e) => setStagedBuyMore(Number(e.target.value))}
-                        className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
-                      />
-                      <label className="text-sm text-matcha-700">No thanks</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={stagedNoThanks}
-                        onChange={(e) => setStagedNoThanks(Number(e.target.value))}
-                        className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
-                      />
+                    <div className="space-y-3 mb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-matcha-700 mb-2">Reviews (how many of each rating)</p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {([
+                            [1, stagedReview1, setStagedReview1],
+                            [2, stagedReview2, setStagedReview2],
+                            [3, stagedReview3, setStagedReview3],
+                            [4, stagedReview4, setStagedReview4],
+                            [5, stagedReview5, setStagedReview5],
+                          ] as const).map(([star, value, setValue]) => (
+                            <div key={star} className="flex items-center gap-1">
+                              <label className="text-sm text-matcha-700">{star}★</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={value}
+                                onChange={(e) => setValue(Number(e.target.value))}
+                                className="w-16 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-matcha-700 mb-2">Purchase decisions</p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <label className="text-sm text-matcha-700">Buy more</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={stagedBuyMore}
+                            onChange={(e) => setStagedBuyMore(Number(e.target.value))}
+                            className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
+                          />
+                          <label className="text-sm text-matcha-700">No thanks</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={stagedNoThanks}
+                            onChange={(e) => setStagedNoThanks(Number(e.target.value))}
+                            className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -465,7 +520,7 @@ export default function AdminPage() {
                 <Card>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-matcha-800">Live results</h3>
-                    <Button size="sm" variant="ghost" onClick={refreshResults} loading={resultsLoading}>
+                    <Button size="sm" variant="ghost" onClick={() => refreshResults(false)} loading={resultsLoading}>
                       Refresh
                     </Button>
                   </div>
@@ -560,7 +615,7 @@ export default function AdminPage() {
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display text-lg font-bold text-matcha-800">Private Results</h2>
-                <Button size="sm" variant="ghost" onClick={refreshResults} loading={resultsLoading}>
+                <Button size="sm" variant="ghost" onClick={() => refreshResults(false)} loading={resultsLoading}>
                   Refresh
                 </Button>
               </div>

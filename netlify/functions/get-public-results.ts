@@ -32,19 +32,40 @@ export const handler: Handler = async (event) => {
     odds: null,
   };
 
-  if (stage === "reviews_reveal" || stage === "spin_open" || stage === "spin_reveal" || stage === "ethical_reveal") {
-    const { data: reviewRows } = await supabase.from("reviews").select("rating").eq("session_id", sessionId);
-    result.reviews = computeReviewAggregate((reviewRows ?? []).map((r) => r.rating));
-  }
-
-  if (stage === "spin_reveal" || stage === "ethical_reveal") {
+  // One switch (results_mode) covers both Reviews and Purchase decisions —
+  // fetched once up front and reused below, rather than branching each
+  // section independently.
+  let resultsMode: "actual" | "staged" = "actual";
+  if (stage !== "welcome") {
     const { data: config } = await supabase
       .from("game_config")
       .select("results_mode")
       .eq("session_id", sessionId)
       .maybeSingle();
+    resultsMode = (config?.results_mode as "actual" | "staged") ?? "actual";
+  }
 
-    if (config?.results_mode === "staged") {
+  if (stage === "reviews_reveal" || stage === "spin_open" || stage === "spin_reveal" || stage === "ethical_reveal") {
+    if (resultsMode === "staged") {
+      const { data: staged } = await supabase
+        .from("staged_results")
+        .select("staged_review_1, staged_review_2, staged_review_3, staged_review_4, staged_review_5")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      const ratings: number[] = [];
+      for (let star = 1 as 1 | 2 | 3 | 4 | 5; star <= 5; star++) {
+        const count = (staged?.[`staged_review_${star}` as const] as number | undefined) ?? 0;
+        for (let i = 0; i < count; i++) ratings.push(star);
+      }
+      result.reviews = computeReviewAggregate(ratings);
+    } else {
+      const { data: reviewRows } = await supabase.from("reviews").select("rating").eq("session_id", sessionId);
+      result.reviews = computeReviewAggregate((reviewRows ?? []).map((r) => r.rating));
+    }
+  }
+
+  if (stage === "spin_reveal" || stage === "ethical_reveal") {
+    if (resultsMode === "staged") {
       const { data: staged } = await supabase
         .from("staged_results")
         .select("staged_buy_more, staged_no_thanks")
