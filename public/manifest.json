@@ -1,0 +1,16 @@
+{
+  "name": "NEAL TEA",
+  "short_name": "NEAL TEA",
+  "description": "A live, in-classroom experience about reviews, rewards, and the Lucky Spin.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffdf7",
+  "theme_color": "#4a7a32",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

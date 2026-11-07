@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply font-body text-caramel-700 antialiased;
+  background: radial-gradient(circle at 20% 0%, #fffdf7 0%, #fdf7e8 45%, #faecc9 100%);
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Baloo 2", "Poppins", system-ui, sans-serif;
+}
+
+::selection {
+  @apply bg-matcha-300 text-white;
+}
+
+/* Scrollbar polish for admin/projector long panels */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c3ddb0;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.bg-grain {
+  background-image: radial-gradient(rgba(176, 111, 51, 0.06) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+.text-shadow-soft {
+  text-shadow: 0 2px 10px rgba(50, 30, 10, 0.15);
+}
