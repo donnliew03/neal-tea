@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Star, Sparkles, Gift } from "lucide-react";
+import { Star, Sparkles } from "lucide-react";
 import Logo from "../components/branding/Logo";
 import BubbleField from "../components/branding/BubbleField";
 import AudioGate from "../components/AudioGate";
 import AudioControls from "../components/AudioControls";
 import SpinWheel from "../components/SpinWheel";
+import JoinQRCode from "../components/JoinQRCode";
 import { useActiveSession } from "../hooks/useActiveSession";
 import { useAudio } from "../hooks/useAudio";
 import { api } from "../lib/api";
@@ -78,9 +79,10 @@ export default function DisplayPage() {
               <Logo size={110} withWordmark />
             </div>
             <h1 className="font-display text-4xl font-extrabold text-matcha-800 mb-4">Welcome!</h1>
-            <p className="text-xl text-matcha-600 mb-8">
-              Join on your phone at <span className="font-mono font-bold text-caramel-600">/join</span>
-            </p>
+            <p className="text-xl text-matcha-600 mb-6">Scan to join on your phone</p>
+            <div className="flex justify-center mb-8">
+              <JoinQRCode size={220} />
+            </div>
             <div className="flex flex-wrap justify-center gap-2 max-h-40 overflow-hidden">
               {nicknames.map((n, i) => (
                 <span key={i} className="px-4 py-2 rounded-full bg-white/80 shadow-soft text-matcha-700 font-semibold text-sm">
@@ -166,17 +168,7 @@ export default function DisplayPage() {
               </div>
             )}
 
-            {session.revealStep >= 2 && publicResults?.stagedPurchases && (
-              <div className="bg-white/80 rounded-3xl shadow-soft p-6 mb-4 text-left animate-pop-in">
-                <h2 className="font-display font-bold text-matcha-800 mb-3 flex items-center gap-2">
-                  <Gift className="h-5 w-5 text-caramel-500" /> At scale, it adds up
-                </h2>
-                <Bar label="Buy more" pct={publicResults.stagedPurchases.buyMorePct} color="#5f9941" />
-                <Bar label="No thanks" pct={publicResults.stagedPurchases.noThanksPct} color="#c98a4b" />
-              </div>
-            )}
-
-            {session.revealStep >= 3 && (
+            {session.revealStep >= 2 && (
               <div className="bg-matcha-700 text-cream-50 rounded-3xl shadow-lift p-6 animate-pop-in">
                 <p className="font-display text-xl font-bold">
                   Incentives aren't neutral. The question isn't whether to use them — it's whether the people on the

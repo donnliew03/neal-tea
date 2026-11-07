@@ -31,7 +31,7 @@ export const handler: Handler = async (event) => {
     supabase.from("purchase_decisions").select("decision").eq("session_id", sessionId),
     supabase.from("spins").select("prize_id, spin_type").eq("session_id", sessionId),
     supabase.from("staged_results").select("*").eq("session_id", sessionId).maybeSingle(),
-    supabase.from("game_config").select("prizes, free_spins_per_participant, purchase_offer_enabled, locked").eq("session_id", sessionId).maybeSingle(),
+    supabase.from("game_config").select("prizes, free_spins_per_participant, purchase_offer_enabled, locked, results_mode").eq("session_id", sessionId).maybeSingle(),
     // "Offered" = participants who have exhausted their free spins (a proxy
     // we compute from spin_balances rather than tracking a separate flag).
     supabase
@@ -78,6 +78,7 @@ export const handler: Handler = async (event) => {
       freeSpins: config?.free_spins_per_participant ?? 2,
       purchaseEnabled: config?.purchase_offer_enabled ?? true,
       locked: config?.locked ?? false,
+      resultsMode: config?.results_mode ?? "actual",
     },
   });
 };

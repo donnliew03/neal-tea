@@ -91,6 +91,9 @@ export const api = {
   setStagedResults: (payload: { adminToken: string; sessionId: string; buyMore: number; noThanks: number }) =>
     call<{ ok: true }>("set-staged-results", payload, payload.adminToken),
 
+  setResultsMode: (payload: { adminToken: string; sessionId: string; mode: "actual" | "staged" }) =>
+    call<{ ok: true }>("set-results-mode", payload, payload.adminToken),
+
   getPrivateResults: (payload: { adminToken: string; sessionId: string }) =>
     call<{ reviews: any; purchases: any; spins: any; staged: any; config: any; participantCount: number }>(
       "get-private-results",
@@ -102,7 +105,7 @@ export const api = {
     call<{ nicknames: string[]; count: number }>("get-public-nicknames", { sessionId }),
 
   getPublicResults: (sessionId: string) =>
-    call<{ reviews: any; purchases: any; odds: any; stagedPurchases?: any }>("get-public-results", { sessionId }),
+    call<{ reviews: any; purchases: any; odds: any }>("get-public-results", { sessionId }),
 
   getPrizeOdds: (sessionId: string) =>
     call<{ odds: any; available: boolean }>("get-prize-odds", { sessionId }),

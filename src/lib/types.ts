@@ -102,12 +102,15 @@ export const DEFAULT_PRIZES: PrizeDef[] = [
 export const DEFAULT_TOTAL_WEIGHT = 1000;
 export const DEFAULT_FREE_SPINS = 2;
 
+export type ResultsMode = "actual" | "staged";
+
 export interface GameConfig {
   session_id: string;
   prizes: PrizeDef[]; // weights may have been edited by admin, ids/labels fixed
   free_spins_per_participant: number;
   purchase_offer_enabled: boolean;
   locked: boolean;
+  results_mode: ResultsMode;
 }
 
 export interface PublicPresentationState {

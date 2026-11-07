@@ -38,14 +38,37 @@ export const handler: Handler = async (event) => {
   }
 
   if (stage === "spin_reveal" || stage === "ethical_reveal") {
-    const { data: purchaseRows } = await supabase.from("purchase_decisions").select("decision").eq("session_id", sessionId);
-    const { count: offeredCandidates } = await supabase
-      .from("spin_balances")
-      .select("participant_id", { count: "exact", head: true })
+    const { data: config } = await supabase
+      .from("game_config")
+      .select("results_mode")
       .eq("session_id", sessionId)
-      .eq("free_spins_remaining", 0);
-    const decisions = (purchaseRows ?? []).map((p) => p.decision as "buy_more" | "no_thanks");
-    result.purchases = computePurchaseAggregate(decisions, offeredCandidates ?? 0);
+      .maybeSingle();
+
+    if (config?.results_mode === "staged") {
+      const { data: staged } = await supabase
+        .from("staged_results")
+        .select("staged_buy_more, staged_no_thanks")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      const buyMore = staged?.staged_buy_more ?? 0;
+      const noThanks = staged?.staged_no_thanks ?? 0;
+      result.purchases = computePurchaseAggregate(
+        [...Array(buyMore).fill("buy_more" as const), ...Array(noThanks).fill("no_thanks" as const)],
+        buyMore + noThanks
+      );
+    } else {
+      const { data: purchaseRows } = await supabase
+        .from("purchase_decisions")
+        .select("decision")
+        .eq("session_id", sessionId);
+      const { count: offeredCandidates } = await supabase
+        .from("spin_balances")
+        .select("participant_id", { count: "exact", head: true })
+        .eq("session_id", sessionId)
+        .eq("free_spins_remaining", 0);
+      const decisions = (purchaseRows ?? []).map((p) => p.decision as "buy_more" | "no_thanks");
+      result.purchases = computePurchaseAggregate(decisions, offeredCandidates ?? 0);
+    }
   }
 
   if (stage === "ethical_reveal" && (session.reveal_step as number) >= 1) {
@@ -57,17 +80,6 @@ export const handler: Handler = async (event) => {
     const prizes: PrizeDef[] = (config?.prizes as PrizeDef[]) ?? DEFAULT_PRIZES;
     const total = prizes.reduce((s, p) => s + p.weight, 0);
     result.odds = prizes.map((p) => ({ id: p.id, label: p.label, pct: Math.round((p.weight / total) * 1000) / 10 }));
-  }
-
-  if (stage === "ethical_reveal" && (session.reveal_step as number) >= 2) {
-    const { data: staged } = await supabase.from("staged_results").select("*").eq("session_id", sessionId).maybeSingle();
-    if (staged && (staged.staged_buy_more > 0 || staged.staged_no_thanks > 0)) {
-      const total = staged.staged_buy_more + staged.staged_no_thanks;
-      (result as any).stagedPurchases = {
-        buyMorePct: total === 0 ? 0 : Math.round((staged.staged_buy_more / total) * 1000) / 10,
-        noThanksPct: total === 0 ? 0 : Math.round((staged.staged_no_thanks / total) * 1000) / 10,
-      };
-    }
   }
 
   return json(200, result);

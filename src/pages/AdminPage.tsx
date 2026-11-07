@@ -10,6 +10,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Save,
+  Monitor,
 } from "lucide-react";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -58,6 +59,8 @@ export default function AdminPage() {
 
   const [stagedBuyMore, setStagedBuyMore] = useState(0);
   const [stagedNoThanks, setStagedNoThanks] = useState(0);
+  const [resultsMode, setResultsMode] = useState<"actual" | "staged">("actual");
+  const [resultsModeSaving, setResultsModeSaving] = useState(false);
 
   useEffect(() => {
     if (!SUPABASE_CONFIGURED) {
@@ -100,6 +103,7 @@ export default function AdminPage() {
       setPurchaseEnabled(r.config.purchaseEnabled);
       setStagedBuyMore(r.staged.buyMore);
       setStagedNoThanks(r.staged.noThanks);
+      setResultsMode(r.config.resultsMode ?? "actual");
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't load results.");
     } finally {
@@ -113,11 +117,13 @@ export default function AdminPage() {
   }, [adminToken, liveSession.id]);
 
   useEffect(() => {
-    if (!adminToken || !liveSession.id || tab !== "results") return;
+    if (!adminToken || !liveSession.id) return;
+    // Poll regardless of which tab is open, so live numbers on Presentation
+    // Control stay fresh even if you never click into Private Results.
     const interval = setInterval(refreshResults, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminToken, liveSession.id, tab]);
+  }, [adminToken, liveSession.id]);
 
   async function handleCreateSession() {
     if (!adminToken) return;
@@ -161,17 +167,30 @@ export default function AdminPage() {
     }
   }
 
-  async function handleSaveStaged() {
+  async function handleSaveResultsDisplay() {
     if (!adminToken || !liveSession.id) return;
-    setBusy(true);
+    setResultsModeSaving(true);
     setActionError(null);
     try {
-      await api.setStagedResults({ adminToken, sessionId: liveSession.id, buyMore: stagedBuyMore, noThanks: stagedNoThanks });
+      await api.setResultsMode({ adminToken, sessionId: liveSession.id, mode: resultsMode });
+      if (resultsMode === "staged") {
+        await api.setStagedResults({
+          adminToken,
+          sessionId: liveSession.id,
+          buyMore: stagedBuyMore,
+          noThanks: stagedNoThanks,
+        });
+      }
+      await refreshResults();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Couldn't save staged results.");
+      setActionError(err instanceof ApiError ? err.message : "Couldn't save results display setting.");
     } finally {
-      setBusy(false);
+      setResultsModeSaving(false);
     }
+  }
+
+  function openPresenterView() {
+    window.open(`${window.location.origin}/display`, "_blank", "noopener,noreferrer");
   }
 
   async function handleReset() {
@@ -254,6 +273,11 @@ export default function AdminPage() {
           <span className="font-display font-bold text-matcha-800">NEAL TEA Admin</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-matcha-500">
+          {liveSession.id && (
+            <Button size="sm" variant="secondary" icon={<Monitor className="h-4 w-4" />} onClick={openPresenterView}>
+              Open Presenter View
+            </Button>
+          )}
           <span>{adminEmail}</span>
           <button onClick={handleLogout} className="flex items-center gap-1 text-matcha-600 hover:text-matcha-800">
             <LogOut className="h-4 w-4" /> Sign out
@@ -315,54 +339,154 @@ export default function AdminPage() {
           )}
 
           {tab === "control" && (
-            <Card>
-              <h2 className="font-display text-lg font-bold text-matcha-800 mb-4">Presentation Control</h2>
-              {!liveSession.id ? (
-                <p className="text-matcha-500">Start a session first.</p>
-              ) : (
-                <div className="space-y-3">
-                  {STAGES.map((s) => (
+            <div className="space-y-4">
+              {liveSession.id && results && (
+                <Card padded={false} className="px-5 py-4 grid grid-cols-3 gap-4 text-center text-sm">
+                  <div>
+                    <div className="text-xs text-matcha-400 uppercase tracking-wide">Participants</div>
+                    <div className="font-display text-xl font-extrabold text-matcha-800">{results.participantCount}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-matcha-400 uppercase tracking-wide">Avg rating</div>
+                    <div className="font-display text-xl font-extrabold text-matcha-800">
+                      {results.reviews.total ? `${results.reviews.average} ★` : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-matcha-400 uppercase tracking-wide">Spins so far</div>
+                    <div className="font-display text-xl font-extrabold text-matcha-800">{results.spins.total}</div>
+                  </div>
+                </Card>
+              )}
+
+              <Card>
+                <h2 className="font-display text-lg font-bold text-matcha-800 mb-4">Presentation Control</h2>
+                {!liveSession.id ? (
+                  <p className="text-matcha-500">Start a session first.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {STAGES.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleSetStage(s.id)}
+                        disabled={busy}
+                        className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-colors ${
+                          liveSession.stage === s.id
+                            ? "border-matcha-500 bg-matcha-50"
+                            : "border-cream-200 hover:border-matcha-300"
+                        }`}
+                      >
+                        <span className="font-semibold text-matcha-800">{s.label}</span>
+                        <ChevronRight className="h-4 w-4 text-matcha-400" />
+                      </button>
+                    ))}
+
+                    {liveSession.stage === "ethical_reveal" && (
+                      <div className="mt-4 pt-4 border-t border-cream-200">
+                        <p className="text-sm font-semibold text-matcha-700 mb-2">Reveal step</p>
+                        <div className="flex gap-2">
+                          {[0, 1, 2].map((step) => (
+                            <button
+                              key={step}
+                              onClick={() => handleSetStage("ethical_reveal", step)}
+                              className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold ${
+                                liveSession.revealStep === step
+                                  ? "border-matcha-500 bg-matcha-50"
+                                  : "border-cream-200"
+                              }`}
+                            >
+                              {step}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-matcha-400 mt-2">
+                          0 = message only · 1 = + real odds · 2 = final takeaway
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+
+              {liveSession.id && (
+                <Card>
+                  <h3 className="font-semibold text-matcha-800 mb-2">Results shown to class</h3>
+                  <p className="text-xs text-matcha-500 mb-3">
+                    Controls the purchase-decision numbers shown at "Lucky Spin Results" and later in the Ethical
+                    Reveal — either your class's real decisions, or a set of numbers you enter yourself.
+                  </p>
+                  <div className="flex gap-2 mb-3">
                     <button
-                      key={s.id}
-                      onClick={() => handleSetStage(s.id)}
-                      disabled={busy}
-                      className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-colors ${
-                        liveSession.stage === s.id
-                          ? "border-matcha-500 bg-matcha-50"
-                          : "border-cream-200 hover:border-matcha-300"
+                      onClick={() => setResultsMode("actual")}
+                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold ${
+                        resultsMode === "actual" ? "border-matcha-500 bg-matcha-50 text-matcha-800" : "border-cream-200 text-matcha-600"
                       }`}
                     >
-                      <span className="font-semibold text-matcha-800">{s.label}</span>
-                      <ChevronRight className="h-4 w-4 text-matcha-400" />
+                      Actual
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setResultsMode("staged")}
+                      className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold ${
+                        resultsMode === "staged" ? "border-matcha-500 bg-matcha-50 text-matcha-800" : "border-cream-200 text-matcha-600"
+                      }`}
+                    >
+                      Staged
+                    </button>
+                  </div>
 
-                  {liveSession.stage === "ethical_reveal" && (
-                    <div className="mt-4 pt-4 border-t border-cream-200">
-                      <p className="text-sm font-semibold text-matcha-700 mb-2">Reveal step</p>
-                      <div className="flex gap-2">
-                        {[0, 1, 2, 3].map((step) => (
-                          <button
-                            key={step}
-                            onClick={() => handleSetStage("ethical_reveal", step)}
-                            className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold ${
-                              liveSession.revealStep === step
-                                ? "border-matcha-500 bg-matcha-50"
-                                : "border-cream-200"
-                            }`}
-                          >
-                            {step}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-matcha-400 mt-2">
-                        0 = message only · 1 = + real odds · 2 = + staged comparison · 3 = final takeaway
-                      </p>
+                  {resultsMode === "staged" && (
+                    <div className="flex items-center gap-3 flex-wrap mb-3">
+                      <label className="text-sm text-matcha-700">Buy more</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={stagedBuyMore}
+                        onChange={(e) => setStagedBuyMore(Number(e.target.value))}
+                        className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
+                      />
+                      <label className="text-sm text-matcha-700">No thanks</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={stagedNoThanks}
+                        onChange={(e) => setStagedNoThanks(Number(e.target.value))}
+                        className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
+                      />
                     </div>
                   )}
-                </div>
+
+                  <Button size="sm" variant="secondary" onClick={handleSaveResultsDisplay} loading={resultsModeSaving}>
+                    Save
+                  </Button>
+                </Card>
               )}
-            </Card>
+
+              {liveSession.id && results && (
+                <Card>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-matcha-800">Live results</h3>
+                    <Button size="sm" variant="ghost" onClick={refreshResults} loading={resultsLoading}>
+                      Refresh
+                    </Button>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                    <div className="rounded-xl bg-cream-50 p-4">
+                      <h4 className="font-semibold text-matcha-800 mb-2">Reviews</h4>
+                      <p>Total: {results.reviews.total}</p>
+                      <p>Average: {results.reviews.average} ★</p>
+                      <p>5★: {results.reviews.fiveStarPct}%</p>
+                    </div>
+                    <div className="rounded-xl bg-cream-50 p-4">
+                      <h4 className="font-semibold text-matcha-800 mb-2">Purchase decisions</h4>
+                      <p>Offered: {results.purchases.offered}</p>
+                      <p>Buy more: {results.purchases.buyMore} ({results.purchases.buyMorePct}%)</p>
+                      <p>No thanks: {results.purchases.noThanks} ({results.purchases.noThanksPct}%)</p>
+                      <p>Pending: {results.purchases.pending}</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
           )}
 
           {tab === "spin" && (
@@ -429,35 +553,6 @@ export default function AdminPage() {
               >
                 {configSaved ? "Saved!" : "Save Settings"}
               </Button>
-
-              <div className="mt-8 pt-5 border-t border-cream-200">
-                <h3 className="font-semibold text-matcha-800 mb-2">Staged comparison (ethical reveal)</h3>
-                <p className="text-xs text-matcha-500 mb-3">
-                  Illustrative numbers shown alongside your class's real purchase decisions, for scale/comparison
-                  only — shown at reveal step 2.
-                </p>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm text-matcha-700">Buy more</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={stagedBuyMore}
-                    onChange={(e) => setStagedBuyMore(Number(e.target.value))}
-                    className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
-                  />
-                  <label className="text-sm text-matcha-700">No thanks</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={stagedNoThanks}
-                    onChange={(e) => setStagedNoThanks(Number(e.target.value))}
-                    className="w-20 rounded-lg border-2 border-cream-200 px-2 py-1 text-sm"
-                  />
-                  <Button size="sm" variant="secondary" onClick={handleSaveStaged} loading={busy}>
-                    Save
-                  </Button>
-                </div>
-              </div>
             </Card>
           )}
 
@@ -469,6 +564,10 @@ export default function AdminPage() {
                   Refresh
                 </Button>
               </div>
+              <p className="text-xs text-matcha-500 mb-4">
+                This same data now also shows live on the Presentation Control tab, so you don't need to switch
+                over here while running a session — this tab is here for a closer look if you want it.
+              </p>
               {!results ? (
                 <p className="text-matcha-500">No data yet.</p>
               ) : (
