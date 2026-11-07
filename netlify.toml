@@ -6,13 +6,10 @@
 [functions]
   node_bundler = "esbuild"
 
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
 # SPA fallback so /admin, /join and /display work when visited directly or
 # refreshed (React Router handles the actual route matching client-side).
+# Netlify always serves actual function requests (/.netlify/functions/*)
+# before applying this catch-all, so functions are unaffected.
 [[redirects]]
   from = "/*"
   to = "/index.html"
